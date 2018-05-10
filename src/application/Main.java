@@ -10,7 +10,7 @@ import javafx.stage.Stage;
  * Glowna klasa
  * 
  * @author Lukasz Smogorzewski
- * @version 1.1
+ * @version 1.2
  *
  */
 public class Main extends Application {

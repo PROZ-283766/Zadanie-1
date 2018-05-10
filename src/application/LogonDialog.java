@@ -1,11 +1,9 @@
 package application;
 
 import java.util.Optional;
-import java.util.Vector;
 
 import javafx.beans.value.ChangeListener;
 import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
 import javafx.util.Pair;
 import javafx.scene.Node;
 import javafx.scene.control.*;
@@ -17,16 +15,16 @@ import javafx.geometry.Insets;
  * Klasa tworzaca okienko logowania
  * 
  * @author Lukasz Smogorzewski
- * @version 1.1
+ * @version 1.2
  *
  */
 public class LogonDialog {
 
 	Dialog<Pair<Environment, String>> dialog = new Dialog<>();
-	private Vector<Pair<String, String>> productionVector = new Vector<Pair<String, String>>(8);
-	private Vector<Pair<String, String>> testVector = new Vector<Pair<String, String>>(8);
-	private Vector<Pair<String, String>> deweloperVector = new Vector<Pair<String, String>>(8);
-	private ObservableList<String> items = FXCollections.observableArrayList();
+	Environment productionEnvironment;
+	Environment testEnvironment;
+	Environment deweloperEnvironment;
+	ComboBox<String> userComboBox;
 
 	/**
 	 * Konstruktor LogonDialog
@@ -40,32 +38,34 @@ public class LogonDialog {
 		dialog.setTitle(windowName);
 		dialog.setHeaderText(headerText);
 
-		init();
+		initializeEnvironments();
 		start();
 	}
 
 	/**
-	 * Metoda inicjalizujaca vectory z przykladowymi danymi logowania
+	 * Metoda inicjalizujaca srodowiska z przykladowymi danymi logowania
 	 */
-	public void init() {
-		productionVector.addElement(new Pair<>("producer", "admin1"));
-		productionVector.addElement(new Pair<>("producer2", "admin1"));
-		productionVector.addElement(new Pair<>("MainProducer", "root"));
+	private void initializeEnvironments() {
+		productionEnvironment = new Environment("Production");
+		productionEnvironment.addUser("producer", "admin1");
+		productionEnvironment.addUser("producer2", "admin1");
+		productionEnvironment.addUser("MainProducer", "root");
 
-		testVector.addElement(new Pair<>("tester", "password"));
-		testVector.addElement(new Pair<>("jan.kowalski", "haselko"));
+		testEnvironment = new Environment("Test");
+		testEnvironment.addUser("tester", "password");
+		testEnvironment.addUser("jan.kowalski", "haselko");
 
-		deweloperVector.addElement(new Pair<>("adam.nowak", "snickers"));
-		deweloperVector.addElement(new Pair<>("ewa.cudna", "123"));
-		deweloperVector.addElement(new Pair<>("janusz.smutny", "rybki123"));
-		deweloperVector.addElement(new Pair<>("antek.smieszny", "leszcz"));
+		deweloperEnvironment = new Environment("Deweloper");
+		deweloperEnvironment.addUser("adam.nowak", "snickers");
+		deweloperEnvironment.addUser("ewa.cudna", "123");
+		deweloperEnvironment.addUser("janusz.smutny", "rybki123");
+		deweloperEnvironment.addUser("antek.smieszny", "leszcz");
 	}
 
 	/**
 	 * Metoda tworzaca okienko dialogowe
 	 */
 	public void start() {
-
 		ButtonType logonButtonType = new ButtonType("Logon", ButtonData.OK_DONE);
 		ButtonType anulujButtonType = new ButtonType("Anuluj", ButtonData.CANCEL_CLOSE);
 		dialog.getDialogPane().getButtonTypes().addAll(logonButtonType, anulujButtonType);
@@ -77,20 +77,19 @@ public class LogonDialog {
 		gridPane.setVgap(10);
 		gridPane.setPadding(new Insets(20, 150, 10, 10));
 
-		Label environmentLbl = new Label("Środowisko:");
-		Label userLbl = new Label("Użytkownik:");
-		Label passwordLbl = new Label("Hasło:");
+		Label environmentLbl = new Label("Srodowisko:");
+		Label userLbl = new Label("Uzytkownik:");
+		Label passwordLbl = new Label("Haslo:");
 
 		ChoiceBox<String> enviChoiceBox = new ChoiceBox<>(
 				FXCollections.observableArrayList("Produkcyjne", "Testowe", "Deweloperskie"));
 
-		ComboBox<String> userComboBox = new ComboBox<>(FXCollections.observableArrayList(items));
-		userComboBox.getItems().addAll(items);
+		userComboBox = new ComboBox<>();
 		userComboBox.setEditable(true);
 		userComboBox.setValue("Username");
 
 		PasswordField passField = new PasswordField();
-		passField.setPromptText("Wpisz tu hasło");
+		passField.setPromptText("Wpisz tu haslo");
 
 		ChangeListener<? super String> logonListener = (ov, t, t1) -> logonButton
 				.setDisable(enviChoiceBox.getValue() == null || userComboBox.getValue().equals("")
@@ -99,8 +98,6 @@ public class LogonDialog {
 		enviChoiceBox.valueProperty().addListener(logonListener);
 		enviChoiceBox.valueProperty().addListener((ov, t, t1) -> {
 			itemsUpdate(t1);
-			userComboBox.getItems().clear();
-			userComboBox.getItems().addAll(items);
 		});
 
 		userComboBox.valueProperty().addListener(logonListener);
@@ -138,12 +135,11 @@ public class LogonDialog {
 	 * @return zwraca informacje czy dane sa poprawne
 	 */
 	private boolean checkPassword(String environment, String username, String password) {
-		if (environment == "Produkcyjne" && productionVector.contains(new Pair<String, String>(username, password))) {
+		if (environment == "Produkcyjne" && productionEnvironment.checkUser(username, password)) {
 			return true;
-		} else if (environment == "Testowe" && testVector.contains(new Pair<String, String>(username, password))) {
+		} else if (environment == "Testowe" && testEnvironment.checkUser(username, password)) {
 			return true;
-		} else if (environment == "Deweloperskie"
-				&& deweloperVector.contains(new Pair<String, String>(username, password))) {
+		} else if (environment == "Deweloperskie" && deweloperEnvironment.checkUser(username, password)) {
 			return true;
 		}
 		return false;
@@ -156,19 +152,13 @@ public class LogonDialog {
 	 *            nazwa srodowiska na ktore ma zostac wykonana zmiana
 	 */
 	private void itemsUpdate(String environment) {
-		items.clear();
+		userComboBox.setValue("");
 		if (environment == "Produkcyjne") {
-			for (int i = 0; i != productionVector.size(); i++) {
-				items.add(productionVector.elementAt(i).getKey());
-			}
+			userComboBox.setItems(productionEnvironment.getUsers());
 		} else if (environment == "Testowe") {
-			for (int i = 0; i != testVector.size(); i++) {
-				items.add(testVector.elementAt(i).getKey());
-			}
+			userComboBox.setItems(testEnvironment.getUsers());
 		} else if (environment == "Deweloperskie") {
-			for (int i = 0; i != deweloperVector.size(); i++) {
-				items.add(deweloperVector.elementAt(i).getKey());
-			}
+			userComboBox.setItems(deweloperEnvironment.getUsers());
 		}
 	}
 
